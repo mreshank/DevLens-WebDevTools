@@ -43,6 +43,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 } else {
                     chrome.tabs.sendMessage(tabId, { action: 'removeRuler' });
                 }
+            } else if (tool === 'hub') {
+                if (isActive) {
+                    // Inject Libraries first, then Hub
+                    chrome.scripting.executeScript({
+                        target: { tabId: tabId },
+                        files: ['content_pixel.js', 'content_inspector.js', 'content_hub.js']
+                    });
+                } else {
+                    chrome.tabs.sendMessage(tabId, { action: 'removeHub' });
+                }
             }
         });
     }
