@@ -55,5 +55,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 }
             }
         });
+    } else if (request.action === 'downloadAssets') {
+        if (request.urls && Array.isArray(request.urls)) {
+            request.urls.forEach(url => {
+                chrome.downloads.download({ url: url });
+            });
+        }
     }
 });

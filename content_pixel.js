@@ -119,6 +119,50 @@
                 // Content
                 setGeom(contentLayer, rect.top + bt + pt, rect.left + bl + pl, rect.width - bl - br - pl - pr, rect.height - bt - bb - pt - pb);
 
+                // --- Smart Guides (Distance to Viewport) ---
+                if (!document.getElementById('wd-guide-lines')) {
+                    const guideContainer = document.createElement('div');
+                    guideContainer.id = 'wd-guide-lines';
+                    Object.assign(guideContainer.style, { position:'fixed', top:0, left:0, width:'100%', height:'100%', pointerEvents:'none', zIndex:'2147483639' });
+                    overlay.appendChild(guideContainer);
+                }
+                const guides = overlay.querySelector('#wd-guide-lines');
+                guides.innerHTML = ''; // Clear previous
+
+                const createLine = (x, y, w, h, distText, isVert) => {
+                    const line = document.createElement('div');
+                    Object.assign(line.style, {
+                        position: 'absolute', background: 'rgba(255, 107, 129, 0.6)', 
+                        left: x+'px', top: y+'px', width: w+'px', height: h+'px'
+                    });
+                    
+                    const label = document.createElement('div');
+                    label.textContent = Math.round(distText) + 'px';
+                    Object.assign(label.style, {
+                        position: 'absolute', color: '#ff6b81', fontSize: '10px', fontWeight: 'bold',
+                        background: 'rgba(0,0,0,0.7)', padding: '2px 4px', borderRadius: '4px'
+                    });
+                    
+                    if (isVert) { // Vertical line
+                        label.style.left = '4px'; label.style.top = '50%'; label.style.transform = 'translateY(-50%)';
+                    } else { // Horizontal line
+                        label.style.top = '-18px'; label.style.left = '50%'; label.style.transform = 'translateX(-50%)';
+                    }
+                    
+                    line.appendChild(label);
+                    guides.appendChild(line);
+                };
+
+                // Top Guide
+                if (rect.top > 0) createLine(rect.left + rect.width/2, 0, 1, rect.top, rect.top, true);
+                // Bottom Guide
+                if (rect.bottom < window.innerHeight) createLine(rect.left + rect.width/2, rect.bottom, 1, window.innerHeight - rect.bottom, window.innerHeight - rect.bottom, true);
+                // Left Guide
+                if (rect.left > 0) createLine(0, rect.top + rect.height/2, rect.left, 1, rect.left, false);
+                // Right Guide
+                if (rect.right < window.innerWidth) createLine(rect.right, rect.top + rect.height/2, window.innerWidth - rect.right, 1, window.innerWidth - rect.right, false);
+
+
                 // Label Position
                 label.style.top = (rect.top - 30 < 0 ? rect.bottom + 10 : rect.top - 30) + 'px';
                 label.style.left = rect.left + 'px';

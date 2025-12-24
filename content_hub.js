@@ -369,13 +369,66 @@
             if (window.DevLens && window.DevLens.PixelStudio) {
                 // Asset Scan
                 const assets = window.DevLens.PixelStudio.scanAssets();
+                // Add Toolbar actions
+                const assetsPanel = contentArea.querySelector('#wd-asset-grid').parentElement;
+                if (!assetsPanel.querySelector('.wd-asset-toolbar')) {
+                    const toolbar = document.createElement('div');
+                    toolbar.className = 'wd-asset-toolbar';
+                    toolbar.style.marginBottom = '10px';
+                    toolbar.innerHTML = `
+                        <button class="wd-btn small" id="wd-asset-dl-all">Download Selected (0)</button>
+                    `;
+                    assetsPanel.insertBefore(toolbar, assetsPanel.children[1]);
+                }
+
                 const grid = contentArea.querySelector('#wd-asset-grid');
                 contentArea.querySelector('#wd-asset-count').textContent = `(${assets.length} found)`;
+                const selected = new Set();
+                const btnDl = contentArea.querySelector('#wd-asset-dl-all');
+
+                const updateBtn = () => {
+                    btnDl.textContent = `Download Selected (${selected.size})`;
+                    btnDl.style.opacity = selected.size > 0 ? '1' : '0.5';
+                };
+
+                btnDl.onclick = () => {
+                   if (selected.size === 0) return;
+                   const urls = Array.from(selected);
+                   chrome.runtime.sendMessage({ action: 'downloadAssets', urls: urls });
+                   alert(`Downloading ${selected.size} assets... check your downloads folder.`);
+                   selected.clear();
+                   updateBtn();
+                   grid.querySelectorAll('img.selected').forEach(i => i.classList.remove('selected'));
+                };
+
                 assets.forEach(a => {
+                    const container = document.createElement('div');
+                    container.style.position = 'relative';
+
                     const img = document.createElement('img');
                     img.src = a.src;
-                    img.style.width = '100%'; img.style.height = '60px'; img.style.objectFit = 'contain'; img.style.background = '#000'; img.style.borderRadius = '4px'; img.style.border = '1px solid #333';
-                    grid.appendChild(img);
+                    img.style.width = '100%'; img.style.height = '60px'; img.style.objectFit = 'contain'; 
+                    img.style.background = '#000'; img.style.borderRadius = '4px'; img.style.border = '1px solid #333'; img.style.cursor = 'pointer';
+                    img.style.transition = 'all 0.1s';
+                    
+                    img.onclick = () => {
+                        if (selected.has(a.src)) {
+                            selected.delete(a.src);
+                            img.style.borderColor = '#333';
+                            img.style.transform = 'scale(1)';
+                            img.classList.remove('selected');
+                        } else {
+                            selected.add(a.src);
+                            img.style.borderColor = '#6c5ce7';
+                            img.style.transform = 'scale(0.95)';
+                            img.classList.add('selected');
+                        }
+                        updateBtn();
+                    };
+                    
+                    img.title = `${a.width}x${a.height} - Click to select`;
+                    container.appendChild(img);
+                    grid.appendChild(container);
                 });
 
                 const btn = contentArea.querySelector('#wd-pixel-start');
