@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
     "name": "DevLens - Web Dev Tools",
-    "version": "1.0",
-    "description": "Premium Web Development Toolkit with Screen Dimensions, Color Picker, and more.",
+    "version": "1.1.0",
+    "description": "Premium Web Development Toolkit with Design Studio, Inspector, and more (Island Mode Enabled).",
     "permissions": [
         "activeTab",
         "scripting",
@@ -26,5 +26,33 @@
     },
     "background": {
         "service_worker": "background.js"
-    }
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "content_inspector.js",
+                "content_pixel.js",
+                "content_shared.js",
+                "content_design_studio.js",
+                "content_deep_inspector.js",
+                "content_network_studio.js",
+                "content_privacy_studio.js",
+                "content_hub.js"
+            ],
+            "run_at": "document_end"
+        }
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "icons/*"
+            ],
+            "matches": [
+                "<all_urls>"
+            ]
+        }
+    ]
 }
