@@ -148,4 +148,75 @@
         return { container: win, body: body };
     };
 
+    /**
+     * Creates a tabbed interface.
+     * @param {string} idPrefix - Prefix for IDs
+     * @param {Array<{id:string, label:string, content:string|HTMLElement}>} tabs 
+     * @returns {HTMLElement} The tabs container
+     */
+    window.DevLens.UI.createTabs = (idPrefix, tabs) => {
+        const container = document.createElement('div');
+        container.className = 'wd-tabs-container';
+        
+        // Header
+        const header = document.createElement('div');
+        header.className = 'wd-tabs-header';
+        header.style.cssText = 'display:flex; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:16px; gap:2px;';
+        
+        // Content Wrapper
+        const contentWrapper = document.createElement('div');
+        contentWrapper.className = 'wd-tabs-content';
+
+        tabs.forEach((tab, index) => {
+            // Tab Button
+            const btn = document.createElement('div');
+            btn.className = `wd-tab-btn ${index === 0 ? 'active' : ''}`;
+            btn.textContent = tab.label;
+            btn.dataset.tab = tab.id;
+            btn.style.cssText = `
+                padding: 8px 12px; 
+                font-size: 11px; 
+                cursor: pointer; 
+                color: ${index === 0 ? '#fff' : '#888'}; 
+                border-bottom: 2px solid ${index === 0 ? '#6c5ce7' : 'transparent'};
+                transition: all 0.2s;
+            `;
+            
+            btn.onmouseover = () => { if(!btn.classList.contains('active')) btn.style.color = '#ccc'; };
+            btn.onmouseout = () => { if(!btn.classList.contains('active')) btn.style.color = '#888'; };
+
+            btn.onclick = () => {
+                // Switch Tabs
+                header.querySelectorAll('.wd-tab-btn').forEach(b => {
+                    b.classList.remove('active');
+                    b.style.color = '#888';
+                    b.style.borderBottomColor = 'transparent';
+                });
+                btn.classList.add('active');
+                btn.style.color = '#fff';
+                btn.style.borderBottomColor = '#6c5ce7';
+
+                contentWrapper.querySelectorAll('.wd-tab-pane').forEach(p => p.style.display = 'none');
+                contentWrapper.querySelector(`#${idPrefix}-pane-${tab.id}`).style.display = 'block';
+            };
+            header.appendChild(btn);
+
+            // Tab Pane
+            const pane = document.createElement('div');
+            pane.id = `${idPrefix}-pane-${tab.id}`;
+            pane.className = 'wd-tab-pane';
+            pane.style.display = index === 0 ? 'block' : 'none';
+            
+            if (typeof tab.content === 'string') pane.innerHTML = tab.content;
+            else pane.appendChild(tab.content);
+            
+            contentWrapper.appendChild(pane);
+        });
+
+        container.appendChild(header);
+        container.appendChild(contentWrapper);
+        return container;
+    };
+
 })();
+
