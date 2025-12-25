@@ -38,6 +38,18 @@
             return [...ls, ...ss, ...cookies];
         },
 
+        setStorage: (type, key, value) => {
+            if (type === 'Local') localStorage.setItem(key, value);
+            else if (type === 'Session') sessionStorage.setItem(key, value);
+            else if (type === 'Cookie') document.cookie = `${key}=${value}; path=/`;
+        },
+
+        deleteStorage: (type, key) => {
+            if (type === 'Local') localStorage.removeItem(key);
+            else if (type === 'Session') sessionStorage.removeItem(key);
+            else if (type === 'Cookie') document.cookie = `${key}=; max-age=0; path=/`;
+        },
+
         // --- Web Vitals ---
         initVitals: (cb) => {
             if (!window.PerformanceObserver) return;
@@ -106,7 +118,7 @@
             };
         },
 
-        // --- Network Waterfall ---
+        // --- Network Waterfall (Performance based) ---
         scanNetwork: () => {
             const resources = performance.getEntriesByType('resource');
             const stats = { total: resources.length, size: 0, js: 0, css: 0, img: 0, fetch: 0, other: 0 };
@@ -122,6 +134,92 @@
                 else stats.other++;
             });
             return stats;
+        },
+
+        // --- Network Studio Pro (Real-time Spy) ---
+        enableNetworkSpy: () => {
+             if (document.getElementById('wd-network-spy-script')) return;
+
+             const script = document.createElement('script');
+             script.id = 'wd-network-spy-script';
+             script.textContent = `
+                (() => {
+                    const XHR = XMLHttpRequest.prototype;
+                    const originalOpen = XHR.open;
+                    const originalSend = XHR.send;
+                    const originalFetch = window.fetch;
+
+                    // Spy XHR
+                    XHR.open = function(method, url) {
+                        this._wd_method = method;
+                        this._wd_url = url;
+                        this._wd_startTime = Date.now();
+                        return originalOpen.apply(this, arguments);
+                    };
+
+                    XHR.send = function(body) {
+                        this.addEventListener('load', function() {
+                            const time = Date.now() - this._wd_startTime;
+                            window.postMessage({
+                                source: 'wd-network-spy',
+                                type: 'xhr',
+                                method: this._wd_method,
+                                url: this._wd_url,
+                                status: this.status,
+                                time: time,
+                                response: this.responseType === '' || this.responseType === 'text' ? this.responseText : '[Blob/ArrayBuffer]'
+                            }, '*');
+                        });
+                        return originalSend.apply(this, arguments);
+                    };
+
+                    // Spy Fetch
+                    window.fetch = async (...args) => {
+                        const startTime = Date.now();
+                        const url = (args[0] && typeof args[0] === 'object') ? args[0].url : args[0];
+                        const method = (args[1] && args[1].method) || 'GET';
+                        
+                        try {
+                            const response = await originalFetch(...args);
+                            const clone = response.clone();
+                            
+                            clone.text().then(text => {
+                                window.postMessage({
+                                    source: 'wd-network-spy',
+                                    type: 'fetch',
+                                    method: method,
+                                    url: url,
+                                    status: response.status,
+                                    time: Date.now() - startTime,
+                                    response: text
+                                }, '*');
+                            }).catch(() => {});
+
+                            return response;
+                        } catch (err) {
+                            window.postMessage({
+                                source: 'wd-network-spy',
+                                type: 'fetch',
+                                method: method,
+                                url: url,
+                                status: 'ERR',
+                                time: Date.now() - startTime,
+                                response: err.message
+                            }, '*');
+                            throw err;
+                        }
+                    };
+                })();
+             `;
+             (document.head || document.documentElement).appendChild(script);
+        },
+
+        onNetworkRequest: (cb) => {
+            window.addEventListener('message', (event) => {
+                if (event.data && event.data.source === 'wd-network-spy') {
+                    cb(event.data);
+                }
+            });
         }
     };
 

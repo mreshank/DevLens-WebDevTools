@@ -232,6 +232,45 @@
             if (PixelStudio.state.selectedEl) {
                 PixelStudio.state.selectedEl.style[prop] = value;
             }
+        },
+
+        // --- Design Studio Ultimate ---
+        scanColors: () => {
+            const colorCounts = {};
+            const addColor = (c) => {
+                if (!c || c === 'rgba(0, 0, 0, 0)' || c === 'transparent') return;
+                colorCounts[c] = (colorCounts[c] || 0) + 1;
+            };
+
+            const all = document.querySelectorAll('*');
+            all.forEach(el => {
+                const style = window.getComputedStyle(el);
+                addColor(style.color);
+                addColor(style.backgroundColor);
+                addColor(style.borderColor);
+            });
+
+            // Sort by frequency
+            return Object.entries(colorCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 20) // Top 20
+                .map(([color, count]) => ({ color, count }));
+        },
+
+        loadGoogleFont: (fontName) => {
+            if (!fontName) return;
+            const id = 'wd-google-font-' + fontName.replace(/\s+/g, '-').toLowerCase();
+            if (!document.getElementById(id)) {
+                const link = document.createElement('link');
+                link.id = id;
+                link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/\s+/g, '+')}:wght@400;700&display=swap`;
+                link.rel = 'stylesheet';
+                document.head.appendChild(link);
+            }
+            // Apply to selected
+            if (PixelStudio.state.selectedEl) {
+                PixelStudio.state.selectedEl.style.fontFamily = `"${fontName}", sans-serif`;
+            }
         }
     };
 

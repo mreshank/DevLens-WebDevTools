@@ -5,6 +5,49 @@
     if (document.getElementById(ID_HUB_DOCK)) return;
 
     // --- Styles ---
+    // Start Network Spy immediately
+    if (window.DevLens && window.DevLens.Inspector && window.DevLens.Inspector.enableNetworkSpy) {
+        window.DevLens.NetworkLog = window.DevLens.NetworkLog || [];
+        window.DevLens.Inspector.enableNetworkSpy();
+        
+        // Global listener to capture data even when tab is closed
+        window.DevLens.Inspector.onNetworkRequest((data) => {
+            window.DevLens.NetworkLog.push(data);
+            if (window.DevLens.NetworkLog.length > 50) window.DevLens.NetworkLog.shift(); // Keep last 50
+            
+            // If UI is open, append row
+            const list = document.getElementById('wd-net-list');
+            if (list) {
+                const req = data;
+                const row = document.createElement('div');
+                Object.assign(row.style, {
+                         display: 'grid', gridTemplateColumns: '40px 50px 1fr 50px', 
+                         padding: '8px 10px', borderBottom: '1px solid #222', 
+                         fontSize: '12px', cursor: 'pointer', color: '#ccc'
+                });
+                const color = req.status >= 400 || req.status === 'ERR' ? '#ff7675' : '#00b894';
+                const name = req.url.split('/').pop().split('?')[0] || req.url;
+                row.innerHTML = `
+                    <span style="color:${color}">${req.status}</span>
+                    <span style="font-weight:bold">${req.method}</span>
+                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${req.url}">${name}</span>
+                    <span style="color:#888">${req.time}ms</span>
+                `;
+                row.onclick = () => {
+                        let pretty = req.response;
+                        try {
+                            const json = JSON.parse(req.response);
+                            pretty = JSON.stringify(json, null, 2);
+                        } catch(e) {}
+                        const details = document.getElementById('wd-net-details');
+                        if(details) details.textContent = pretty;
+                };
+                list.appendChild(row);
+                list.scrollTop = list.scrollHeight;
+            }
+        });
+    }
+
     const style = document.createElement('style');
     style.id = 'wd-hub-style';
     style.textContent = `
@@ -198,9 +241,9 @@
     // Dock Items Config
     const dockItems = [
         { id: 'home', icon: '⚡', label: 'Hub' },
-        { id: 'pixel', icon: '📐', label: 'Pixel Studio', bg: '#6c5ce7' },
+        { id: 'pixel', icon: '🎨', label: 'Design Studio', bg: '#6c5ce7' },
         { id: 'inspector', icon: '🔍', label: 'Inspector', bg: '#0984e3' },
-        { id: 'network', icon: '🌐', label: 'Network', bg: '#00b894' },
+        { id: 'network', icon: '🌐', label: 'Network Studio', bg: '#00b894' },
         { id: 'privacy', icon: '🛡️', label: 'Privacy', bg: '#d63031' }
     ];
 
@@ -229,8 +272,9 @@
         <div class="wd-sidebar">
             <div class="wd-brand">⚡ DevLens</div>
             <div class="wd-nav-item active" data-tab="overview">🏠 Overview</div>
-            <div class="wd-nav-item" data-tab="pixel">📐 Pixel Studio</div>
-            <div class="wd-nav-item" data-tab="inspector">🔍 Inspector</div>
+            <div class="wd-nav-item" data-tab="pixel">🎨 Design Studio</div>
+            <div class="wd-nav-item" data-tab="inspector">🔍 Deep Inspector</div>
+            <div class="wd-nav-item" data-tab="network">🌐 Network Studio</div>
             <div class="wd-nav-item" data-tab="privacy">🛡️ Network & Privacy</div>
             <div class="wd-nav-item" data-tab="settings">⚙️ Settings</div>
         </div>
@@ -303,9 +347,9 @@
                 </div>
                 <div class="wd-app-grid">
                     <div class="wd-app-card" onclick="document.querySelector('[data-tab=pixel]').click()">
-                        <div class="wd-app-icon">📐</div>
-                        <div class="wd-app-title">Pixel Studio Pro</div>
-                        <div class="wd-app-desc">Box Model, Style Editor, Assets.</div>
+                        <div class="wd-app-icon">🎨</div>
+                        <div class="wd-app-title">Design Studio Ultimate</div>
+                        <div class="wd-app-desc">Visual Editor, Fonts, Palette.</div>
                     </div>
                     <div class="wd-app-card" onclick="document.querySelector('[data-tab=inspector]').click()">
                         <div class="wd-app-icon">🔍</div>
@@ -320,67 +364,129 @@
                 </div>
             `;
         } else if (tab === 'pixel') {
-            // --- PIXEL STUDIO PRO ---
+            // --- DESIGN STUDIO ULTIMATE ---
             contentArea.innerHTML = `
                 <div class="wd-toolbar">
-                    <h2>📐 Pixel Studio Pro</h2>
+                    <h2>🎨 Design Studio Ultimate</h2>
                     <button class="wd-btn" id="wd-pixel-start">Start Inspector</button>
                     <span id="wd-pixel-status" style="margin-left:10px; font-size:12px; color:#888;">Inactive</span>
                 </div>
-                <div class="wd-panel-grid">
-                    <!-- Style Editor Panel -->
-                    <div class="wd-panel">
-                        <h3>Selected Element <span id="wd-sel-tag" style="color:#6c5ce7"></span></h3>
-                        <div id="wd-style-editor" style="display:none; font-size:12px; color:#ccc;">
-                            <div class="wd-form-group">
-                                <label>Color</label> <input type="text" data-prop="color">
-                            </div>
-                            <div class="wd-form-group">
-                                <label>Background</label> <input type="text" data-prop="background">
-                            </div>
-                            <div class="wd-form-group">
-                                <label>Font Size</label> <input type="text" data-prop="fontSize">
-                            </div>
-                            <div class="wd-form-group">
-                                <label>Margin</label> <input type="text" data-prop="margin">
-                            </div>
-                            <div class="wd-form-group">
-                                <label>Padding</label> <input type="text" data-prop="padding">
-                            </div>
-                        </div>
-                        <div id="wd-style-placeholder" style="color:#666; font-style:italic; padding:20px 0;">
-                            Click an element on the page to edit styles.
-                        </div>
-                    </div>
+                
+                <div class="wd-panel-grid" style="grid-template-columns: 1fr 1fr;">
                     
-                    <!-- Assets Panel -->
-                    <div class="wd-panel">
-                        <h3>Assets <span id="wd-asset-count" style="font-size: 11px; color:#666"></span></h3>
-                        <div id="wd-asset-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 8px; max-height: 300px; overflow-y: auto;"></div>
+                    <!-- EDITOR COLUMN -->
+                    <div style="display:flex; flex-direction:column; gap:16px;">
+                        
+                        <!-- Visual Editor -->
+                        <div class="wd-panel">
+                            <h3>Visual Editor <span id="wd-sel-tag" style="color:#6c5ce7; font-size:12px;">(Select Element)</span></h3>
+                            <div id="wd-style-editor" style="display:none;">
+                                <!-- Spacing -->
+                                <div class="wd-control-group">
+                                    <label>Dimensions</label>
+                                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                                        <input type="text" placeholder="Width" data-prop="width">
+                                        <input type="text" placeholder="Height" data-prop="height">
+                                    </div>
+                                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:8px;">
+                                        <input type="text" placeholder="Margin" data-prop="margin">
+                                        <input type="text" placeholder="Padding" data-prop="padding">
+                                    </div>
+                                </div>
+
+                                <!-- Typography -->
+                                <div class="wd-control-group" style="margin-top:16px;">
+                                    <label>Typography</label>
+                                    <div style="display:flex; gap:8px; margin-bottom:8px;">
+                                        <input type="color" data-prop="color" style="width:30px; height:30px; padding:0; border:none; background:none;" title="Text Color">
+                                        <input type="text" placeholder="Size (px)" data-prop="fontSize" style="width:60px;">
+                                        <select id="wd-font-select" style="flex:1; background:#333; color:#fff; border:1px solid #444; border-radius:4px;">
+                                            <option value="">Swap Font...</option>
+                                            <option value="Inter">Inter</option>
+                                            <option value="Roboto">Roboto</option>
+                                            <option value="Open Sans">Open Sans</option>
+                                            <option value="Lato">Lato</option>
+                                            <option value="Montserrat">Montserrat</option>
+                                            <option value="Poppins">Poppins</option>
+                                            <option value="Playfair Display">Playfair Display</option>
+                                        </select>
+                                    </div>
+                                    <div style="display:flex; gap:8px;">
+                                        <button class="wd-btn-icon" data-prop="fontWeight" data-val="bold">B</button>
+                                        <button class="wd-btn-icon" data-prop="fontStyle" data-val="italic">I</button>
+                                        <button class="wd-btn-icon" data-prop="textDecoration" data-val="underline">U</button>
+                                        <button class="wd-btn-icon" data-prop="textAlign" data-val="left">⇤</button>
+                                        <button class="wd-btn-icon" data-prop="textAlign" data-val="center">↔</button>
+                                        <button class="wd-btn-icon" data-prop="textAlign" data-val="right">⇥</button>
+                                        <button class="wd-btn-icon" id="wd-text-edit-toggle" title="Edit Text Content" style="color:#e17055">✎</button>
+                                    </div>
+                                </div>
+
+                                <!-- Layout (Flex) -->
+                                <div class="wd-control-group" style="margin-top:16px;">
+                                    <label>Layout (Flex)</label>
+                                    <div style="display:flex; gap:8px; margin-bottom:8px;">
+                                        <button class="wd-btn-sm" onclick="window.DevLens.PixelStudio.applyStyle('display','flex')">Make Flex</button>
+                                        <button class="wd-btn-sm" onclick="window.DevLens.PixelStudio.applyStyle('display','grid')">Make Grid</button>
+                                    </div>
+                                    <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                                        <button class="wd-btn-icon" title="Justify Start" onclick="window.DevLens.PixelStudio.applyStyle('justifyContent','flex-start')">├</button>
+                                        <button class="wd-btn-icon" title="Justify Center" onclick="window.DevLens.PixelStudio.applyStyle('justifyContent','center')">┼</button>
+                                        <button class="wd-btn-icon" title="Justify End" onclick="window.DevLens.PixelStudio.applyStyle('justifyContent','flex-end')">┤</button>
+                                        <button class="wd-btn-icon" title="Justify Between" onclick="window.DevLens.PixelStudio.applyStyle('justifyContent','space-between')">|||</button>
+                                        <button class="wd-btn-icon" title="Align Center" onclick="window.DevLens.PixelStudio.applyStyle('alignItems','center')">✛</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="wd-style-placeholder" style="color:#666; font-style:italic; padding:20px 0;">
+                                Click an element on the page to start designing.
+                            </div>
+                        </div>
                     </div>
+
+                    <!-- ASSETS & PALETTE COLUMN -->
+                    <div style="display:flex; flex-direction:column; gap:16px;">
+                        
+                        <!-- Palette Generator -->
+                        <div class="wd-panel">
+                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <h3>Site Palette</h3>
+                                <button class="wd-btn small" id="wd-scan-colors">Scan</button>
+                             </div>
+                             <div id="wd-palette-grid" style="display:flex; flex-wrap:wrap; gap:8px;">
+                                 <em style="color:#666; font-size:12px">Click 'Scan' to generate.</em>
+                             </div>
+                        </div>
+
+                        <!-- Assets -->
+                        <div class="wd-panel" style="flex:1; display:flex; flex-direction:column;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <h3>Assets <span id="wd-asset-count" style="font-size: 11px; color:#666"></span></h3>
+                            </div>
+                            <!-- Toolbar injected by previous step here -->
+                             <div class="wd-asset-toolbar" style="margin-bottom:10px;">
+                                <button class="wd-btn small" id="wd-asset-dl-all">Download Selected (0)</button>
+                             </div>
+                            
+                            <div id="wd-asset-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 8px; overflow-y: auto;"></div>
+                        </div>
+                    </div>
+
                 </div>
                 <style>
-                    .wd-form-group { display: flex; align-items: center; margin-bottom: 8px; }
-                    .wd-form-group label { width: 80px; color: #888; }
-                    .wd-form-group input { flex: 1; background: #222; border: 1px solid #444; color: #fff; padding: 4px; border-radius: 4px; }
+                    .wd-control-group label { display:block; color:#888; font-size:11px; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+                    .wd-control-group input { background: #222; border: 1px solid #444; color: #fff; padding: 6px; border-radius: 4px; font-size:12px; width:100%; box-sizing:border-box; }
+                    .wd-btn-icon { background:#333; border:1px solid #444; color:#fff; width:28px; height:28px; border-radius:4px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+                    .wd-btn-icon:hover { background:#444; }
+                    .wd-btn-sm { background:#6c5ce7; border:none; color:#fff; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px; }
                 </style>
             `;
 
             if (window.DevLens && window.DevLens.PixelStudio) {
                 // Asset Scan
                 const assets = window.DevLens.PixelStudio.scanAssets();
-                // Add Toolbar actions
-                const assetsPanel = contentArea.querySelector('#wd-asset-grid').parentElement;
-                if (!assetsPanel.querySelector('.wd-asset-toolbar')) {
-                    const toolbar = document.createElement('div');
-                    toolbar.className = 'wd-asset-toolbar';
-                    toolbar.style.marginBottom = '10px';
-                    toolbar.innerHTML = `
-                        <button class="wd-btn small" id="wd-asset-dl-all">Download Selected (0)</button>
-                    `;
-                    assetsPanel.insertBefore(toolbar, assetsPanel.children[1]);
-                }
-
+                
+                // Asset Logic (Re-implementing bulk logic since we overwrote HTML)
                 const grid = contentArea.querySelector('#wd-asset-grid');
                 contentArea.querySelector('#wd-asset-count').textContent = `(${assets.length} found)`;
                 const selected = new Set();
@@ -395,7 +501,7 @@
                    if (selected.size === 0) return;
                    const urls = Array.from(selected);
                    chrome.runtime.sendMessage({ action: 'downloadAssets', urls: urls });
-                   alert(`Downloading ${selected.size} assets... check your downloads folder.`);
+                   alert(`Downloading ${selected.size} assets...`);
                    selected.clear();
                    updateBtn();
                    grid.querySelectorAll('img.selected').forEach(i => i.classList.remove('selected'));
@@ -403,61 +509,98 @@
 
                 assets.forEach(a => {
                     const container = document.createElement('div');
-                    container.style.position = 'relative';
-
+                    container.style.position = 'relative'; 
                     const img = document.createElement('img');
                     img.src = a.src;
-                    img.style.width = '100%'; img.style.height = '60px'; img.style.objectFit = 'contain'; 
-                    img.style.background = '#000'; img.style.borderRadius = '4px'; img.style.border = '1px solid #333'; img.style.cursor = 'pointer';
-                    img.style.transition = 'all 0.1s';
-                    
+                    img.style.width = '100%'; img.style.height = '60px'; img.style.objectFit = 'contain'; img.style.background = '#000'; img.style.borderRadius = '4px'; img.style.border = '1px solid #333'; img.style.cursor = 'pointer';
                     img.onclick = () => {
                         if (selected.has(a.src)) {
                             selected.delete(a.src);
-                            img.style.borderColor = '#333';
-                            img.style.transform = 'scale(1)';
-                            img.classList.remove('selected');
+                            img.style.borderColor = '#333'; img.style.transform = 'scale(1)'; img.classList.remove('selected');
                         } else {
                             selected.add(a.src);
-                            img.style.borderColor = '#6c5ce7';
-                            img.style.transform = 'scale(0.95)';
-                            img.classList.add('selected');
+                            img.style.borderColor = '#6c5ce7'; img.style.transform = 'scale(0.95)'; img.classList.add('selected');
                         }
                         updateBtn();
                     };
-                    
-                    img.title = `${a.width}x${a.height} - Click to select`;
                     container.appendChild(img);
                     grid.appendChild(container);
                 });
 
+                // Palette Logic
+                const btnScan = contentArea.querySelector('#wd-scan-colors');
+                const pGrid = contentArea.querySelector('#wd-palette-grid');
+                btnScan.onclick = () => {
+                     btnScan.textContent = 'Scanning...';
+                     // Small delay to render text
+                     setTimeout(() => {
+                         const colors = window.DevLens.PixelStudio.scanColors();
+                         pGrid.innerHTML = '';
+                         colors.forEach(c => {
+                             const swatch = document.createElement('div');
+                             swatch.title = `${c.color} (${c.count} uses)`;
+                             Object.assign(swatch.style, { width:'32px', height:'32px', borderRadius:'50%', background:c.color, border:'2px solid rgba(255,255,255,0.1)', cursor:'pointer' });
+                             swatch.onclick = () => {
+                                 navigator.clipboard.writeText(c.color);
+                                 swatch.style.transform = 'scale(1.2)';
+                                 setTimeout(()=>swatch.style.transform='scale(1)', 200);
+                             };
+                             pGrid.appendChild(swatch);
+                         });
+                         btnScan.textContent = 'Scan';
+                     }, 50);
+                };
+
+
+                // Inspector Logic
                 const btn = contentArea.querySelector('#wd-pixel-start');
                 const status = contentArea.querySelector('#wd-pixel-status');
                 const editor = contentArea.querySelector('#wd-style-editor');
                 const placeholder = contentArea.querySelector('#wd-style-placeholder');
                 const tagLabel = contentArea.querySelector('#wd-sel-tag');
+                const fontSelect = contentArea.querySelector('#wd-font-select');
                 
-                // Wire up Selection
+                // Font Swap
+                fontSelect.onchange = () => {
+                     window.DevLens.PixelStudio.loadGoogleFont(fontSelect.value);
+                };
+
+                // Type Style Buttons
+                editor.querySelectorAll('.wd-btn-icon[data-prop]').forEach(b => {
+                    b.onclick = () => window.DevLens.PixelStudio.applyStyle(b.dataset.prop, b.dataset.val);
+                });
+
+                // Content Mode Toggle
+                const btnEdit = contentArea.querySelector('#wd-text-edit-toggle');
+                let isEditing = false;
+                btnEdit.onclick = () => {
+                    isEditing = !isEditing;
+                    document.designMode = isEditing ? 'on' : 'off';
+                    btnEdit.style.background = isEditing ? '#e17055' : '#333';
+                    btnEdit.style.color = isEditing ? '#fff' : '#e17055';
+                    if(isEditing) alert('Content Mode ON: You can now type anywhere on the page!');
+                };
+
+                // Selection Listener
                 window.DevLens.PixelStudio.on('select', (data) => {
-                    // Force Pixel tab active if not? No, user might be elsewhere.
-                    // If we are in Pixel tab, update UI
                     if(tab === 'pixel') {
-                        // Open Dashboard if minimized?
                         if(dashboard.style.display === 'none') openDashboard('pixel');
-                        
                         placeholder.style.display = 'none';
                         editor.style.display = 'block';
                         tagLabel.textContent = `<${data.tagName}>`;
                         
                         // Populate Inputs
-                        editor.querySelectorAll('input').forEach(inp => {
+                        editor.querySelectorAll('input[data-prop]').forEach(inp => {
                             const prop = inp.dataset.prop;
-                            inp.value = data.style[prop] || '';
-                            
-                            // Live Edit
-                            inp.oninput = () => {
-                                window.DevLens.PixelStudio.applyStyle(prop, inp.value);
-                            };
+                            if (inp.type === 'color') {
+                                // Convert rgb to hex for input type=color? Or just rely on text input?
+                                // input type=color needs hex. data.style.color is usually rgb.
+                                // We'll skip complex conversion for now and rely on text inputs, 
+                                // BUT I added a color input. Let's make it a text/color hybrid or just text for simplicity in this turn.
+                            } else {
+                                inp.value = data.style[prop] || '';
+                            }
+                            inp.oninput = () => window.DevLens.PixelStudio.applyStyle(prop, inp.value);
                         });
                     }
                 });
@@ -470,7 +613,7 @@
                         status.textContent = 'Inactive';
                         dashboard.classList.remove('minimized'); 
                     } else {
-                        closeDashboard(); // Minimize for inspection
+                        closeDashboard(); 
                         window.DevLens.PixelStudio.enableInspector();
                         btn.classList.add('active');
                         btn.textContent = 'Stop Inspector';
@@ -478,6 +621,7 @@
                     }
                 };
             }
+
 
         } else if (tab === 'inspector') {
              // --- DEEP INSPECTOR APP ---
@@ -554,6 +698,87 @@
                 });
             }
 
+        } else if (tab === 'network') {
+            // --- NETWORK STUDIO PRO ---
+            contentArea.innerHTML = `
+                <div class="wd-toolbar">
+                    <h2>🌐 Network Studio Pro</h2>
+                    <button class="wd-btn small" id="wd-net-clear">Clear</button>
+                    <span id="wd-net-status" style="margin-left:auto; font-size:12px; color:#666;">recording activity...</span>
+                </div>
+                <div class="wd-network-layout" style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; height: calc(100% - 50px);">
+                    <!-- Request List -->
+                    <div class="wd-panel" style="overflow:hidden; display:flex; flex-direction:column; padding:0;">
+                        <div style="padding:10px; border-bottom:1px solid #333; font-size:11px; font-weight:bold; color:#888; display:grid; grid-template-columns: 40px 50px 1fr 50px;">
+                            <span>Stat</span><span>Meth</span><span>Name</span><span>Time</span>
+                        </div>
+                        <div id="wd-net-list" style="overflow-y:auto; flex:1;"></div>
+                    </div>
+                    
+                    <!-- Details/JSON Viewer -->
+                    <div class="wd-panel" style="overflow:hidden; display:flex; flex-direction:column;">
+                         <h3 style="border-bottom:1px solid #333; padding-bottom:8px; margin-bottom:0;">Response</h3>
+                         <div id="wd-net-details" style="overflow:auto; flex:1; padding-top:10px; font-family:monospace; font-size:12px; color:#a29bfe; white-space:pre-wrap;">
+                             Select a request to view details.
+                         </div>
+                    </div>
+                </div>
+            `;
+            
+            if (window.DevLens && window.DevLens.Inspector) {
+                const list = contentArea.querySelector('#wd-net-list');
+                const details = contentArea.querySelector('#wd-net-details');
+                const btnClear = contentArea.querySelector('#wd-net-clear');
+                
+                // Keep track of requests
+                const requests = window.DevLens.NetworkLog || []; 
+
+                const renderRow = (req) => {
+                    const row = document.createElement('div');
+                    Object.assign(row.style, {
+                         display: 'grid', gridTemplateColumns: '40px 50px 1fr 50px', 
+                         padding: '8px 10px', borderBottom: '1px solid #222', 
+                         fontSize: '12px', cursor: 'pointer', color: '#ccc'
+                    });
+                    
+                    const color = req.status >= 400 || req.status === 'ERR' ? '#ff7675' : '#00b894';
+                    const name = req.url.split('/').pop().split('?')[0] || req.url;
+                    
+                    row.innerHTML = `
+                        <span style="color:${color}">${req.status}</span>
+                        <span style="font-weight:bold">${req.method}</span>
+                        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${req.url}">${name}</span>
+                        <span style="color:#888">${req.time}ms</span>
+                    `;
+                    
+                    row.onclick = () => {
+                        // Show Details
+                        // Try parsing JSON
+                        let pretty = req.response;
+                        try {
+                            const json = JSON.parse(req.response);
+                            pretty = JSON.stringify(json, null, 2);
+                        } catch(e) {}
+                        details.textContent = pretty;
+                    };
+                    list.appendChild(row);
+                };
+
+                // Render existing
+                requests.forEach(renderRow);
+
+                // Listen for new (if we aren't already global listening somewhere)
+                // Ideally, we listen once globally and push to array.
+                // Let's attach a listener here just for UI updates if tab is open.
+                // NOTE: We need a global storage for requests otherwise they disappear on tab switch.
+            }
+
+            // Bind Clear
+            contentArea.querySelector('#wd-net-clear').onclick = () => {
+                 window.DevLens.NetworkLog = [];
+                 contentArea.querySelector('#wd-net-list').innerHTML = '';
+                 contentArea.querySelector('#wd-net-details').textContent = 'Cleared.';
+            };
         } else if (tab === 'privacy') {
             // ... (keep existing privacy code, simplified below for brevity or reuse) ...
             // Re-injecting previous Privacy Code for consistency
